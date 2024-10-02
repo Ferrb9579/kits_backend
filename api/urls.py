@@ -1,8 +1,15 @@
 from django.urls import path
 from . import views
+
 urlpatterns = [
     path('login/', views.UserLoginView.as_view(), name='login'),
     path('events/', views.EventListView.as_view(), name='event_list'),
     path('events/<int:event_id>/register/', views.EventRegisterView.as_view(), name='event_register'),
-    path('users/<int:user_id>/registrations/', views.UserRegistrationsView.as_view(), name='user_registrations'),
+    
+    path('events/create/', views.EventCreateView.as_view(), name='event_create'),
+    path('events/<int:event_id>/registered-students/', views.EventRegisteredStudentsView.as_view(), name='event_registered_students'),
+    path('events/<int:event_id>/close-registration/', views.EventCloseRegistrationView.as_view(), name='event_close_registration'),
+    path('events/<int:event_id>/create-attendance-session/', views.AttendanceSessionCreateView.as_view(), name='create_attendance_session'),
+    path('attendance-sessions/<int:session_id>/record/', views.AttendanceRecordView.as_view(), name='record_attendance'),
+    path('attendance-sessions/<int:session_id>/list/', views.AttendanceListView.as_view(), name='list_attendance'),
 ]

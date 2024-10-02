@@ -125,7 +125,7 @@ USE_I18N = True
 
 USE_TZ = True
 
-APPEND_SLASH = True
+APPEND_SLASH = True # Enables trailing slash
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
