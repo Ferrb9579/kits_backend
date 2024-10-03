@@ -6,8 +6,9 @@ class Department(models.Model):
 
     def __str__(self):
         return self.name
-    
+
 class User(AbstractUser):
+    register_id = models.CharField(max_length=100, unique=True)
     is_faculty = models.BooleanField(default=False)
     department = models.ForeignKey('Department', on_delete=models.SET_NULL, null=True)
 
@@ -42,6 +43,7 @@ class Event(models.Model):
     allowed_departments = models.ManyToManyField(Department, blank=True)
     registration_open = models.BooleanField(default=True)
     available_slots = models.PositiveIntegerField(default=0)
+    attendance_sessions = models.JSONField(default=list)  # Stores session IDs as JSON list
 
     def __str__(self):
         return self.title
@@ -60,20 +62,25 @@ class Registration(models.Model):
     def __str__(self):
         return f"{self.user.username} - {self.event.title}"
 
-class AttendanceSession(models.Model):
-    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='attendance_sessions')
-    name = models.CharField(max_length=100)
-    created_at = models.DateTimeField(auto_now_add=True)
-    attendees = models.ManyToManyField(User, through='Attendance')
-
-    def __str__(self):
-        return f"{self.event.title} - {self.name}"
-
 class Attendance(models.Model):
-    session = models.ForeignKey(AttendanceSession, on_delete=models.CASCADE, related_name='attendances')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    event = models.ForeignKey(Event, on_delete=models.CASCADE)
+    session_id = models.IntegerField()  # Track attendance by session ID
+    created_at = models.DateTimeField(auto_now_add=True)
     is_present = models.BooleanField(default=False)
     was_registered = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"{self.user.username} - {self.session.event.title} - {self.session.name}"
+        return f"{self.user.username} - {self.event.title} - Session {self.session_id}"
+
+    class Meta:
+        unique_together = ('user', 'event', 'session_id')  # Ensures unique attendance for a session
+
+# Optional helper model if you still need session-specific names or data
+class AttendanceSession(models.Model):
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='event_attendance_sessions')
+    name = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.event.title} - {self.name}"

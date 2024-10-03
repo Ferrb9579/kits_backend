@@ -3,8 +3,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
-from .models import User, Event, Registration, Department, AttendanceSession, Attendance
-from .serializers import EventSerializer, RegistrationSerializer, AttendanceSessionSerializer, AttendanceSerializer
+from .models import User, Event, Registration, Attendance, AttendanceSession
+from .serializers import EventSerializer, RegistrationSerializer, AttendanceSerializer, AttendanceSessionSerializer
 import requests
 
 EXTERNAL_API_AUTH_URL = "http://127.0.0.1:3000/auth"
@@ -81,6 +81,7 @@ class EventListView(APIView):
 
 class UserLoginView(APIView):
     def post(self, request):
+        print(request.data)
         external_auth_data = {
             'email': request.data.get('email'),
             'password': request.data.get('password'),
@@ -91,12 +92,14 @@ class UserLoginView(APIView):
         if response.status_code == 200:
             auth_data = {
                 "name": "Fanisus",
-                "email": "fanisusr@karunya.edu.in"
+                "email": "fanisusr@karunya.edu.in",
+                "register_id": "12345"
             }
             user, created = User.objects.update_or_create(
-                email=auth_data['email'],
+                register_id=auth_data['register_id'],
                 defaults={
                     'username': auth_data['name'],
+                    'email': auth_data['email'],
                     'name': auth_data['name']
                 }
             )
@@ -121,29 +124,38 @@ class AttendanceSessionCreateView(APIView):
         serializer = AttendanceSessionSerializer(data=request.data)
         if serializer.is_valid():
             session = serializer.save(event=event)
+            # Append the session ID to the event's attendance_sessions list
+            event.attendance_sessions.append(session.id)
+            event.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class AttendanceRecordView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def post(self, request, session_id):
-        session = get_object_or_404(AttendanceSession, pk=session_id)
+    def post(self, request, event_id):
+        event = get_object_or_404(Event, pk=event_id)
 
-        if request.user != session.event.created_by:
+        if request.user != event.created_by:
             return Response({'error': 'Only the event creator can record attendance'}, status=status.HTTP_403_FORBIDDEN)
 
-        user_id = request.data.get('user_id')
+        session_id = request.data.get('session_id')  # Now using session_id
+        register_id = request.data.get('register_id')
         is_present = request.data.get('is_present', False)
 
-        user = get_object_or_404(User, pk=user_id)
-        was_registered = Registration.objects.filter(user=user, event=session.event).exists()
+        user = get_object_or_404(User, register_id=register_id)
+        was_registered = Registration.objects.filter(user=user, event=event).exists()
 
-        attendance, created = Attendance.objects.update_or_create(
-            session=session,
+        attendance, created = Attendance.objects.get_or_create(
             user=user,
+            event=event,
+            session_id=session_id,
             defaults={'is_present': is_present, 'was_registered': was_registered}
         )
+
+        if not created:
+            attendance.is_present = is_present
+            attendance.save()
 
         serializer = AttendanceSerializer(attendance)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -151,12 +163,12 @@ class AttendanceRecordView(APIView):
 class AttendanceListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def get(self, request, session_id):
-        session = get_object_or_404(AttendanceSession, pk=session_id)
+    def get(self, request, event_id):
+        event = get_object_or_404(Event, pk=event_id)
 
-        if request.user != session.event.created_by:
+        if request.user != event.created_by:
             return Response({'error': 'Only the event creator can view attendance'}, status=status.HTTP_403_FORBIDDEN)
 
-        attendances = Attendance.objects.filter(session=session)
+        attendances = Attendance.objects.filter(event=event)
         serializer = AttendanceSerializer(attendances, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
